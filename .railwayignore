@@ -1,0 +1,7 @@
+# Ignore web frontend during API deployment
+app/web/
+node_modules/
+*.log
+.env
+.env.local
+.DS_Store

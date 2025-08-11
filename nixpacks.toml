@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["python311", "python311Packages.pip"]
+
+[phases.install]
+cmds = ["pip install -r app/api/requirements.txt"]
+
+[phases.build]
+cmds = ["echo 'Python API build complete'"]
+
+[start]
+cmd = "cd app/api && python main.py"
+
+[variables]
+NIXPACKS_NODE_VERSION = "18"
