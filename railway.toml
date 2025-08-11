@@ -1,0 +1,22 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "cd app/api && python main.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+
+[phases.setup]
+nixPkgs = ["python311", "nodejs", "npm"]
+
+[phases.install]
+cmds = [
+  "pip install -r app/api/requirements.txt",
+  "cd app/web && npm install"
+]
+
+[phases.build]
+cmds = [
+  "cd app/web && npm run build",
+  "echo 'Full-stack build complete'"
+]
