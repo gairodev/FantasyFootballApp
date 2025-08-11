@@ -1,6 +1,6 @@
-# 🚂 Railway Deployment Guide (Unified Service)
+# 🚂 Multi-Service Railway Deployment Guide
 
-This guide explains how to deploy your Fantasy Football app to Railway as a unified service that includes both the API backend and web frontend.
+This guide explains how Railway will automatically detect and deploy your **4 separate services** as one unified project.
 
 ## 🏗️ **Service Architecture**
 
@@ -8,45 +8,59 @@ This guide explains how to deploy your Fantasy Football app to Railway as a unif
 ┌─────────────────────────────────────────────────────────────┐
 │                    Railway Project                         │
 ├─────────────────────────────────────────────────────────────┤
-│  🚀 Unified Service (Python API + Next.js Frontend)       │
-│  • Backend: FastAPI with Sleeper integration               │
-│  • Frontend: Next.js React app                             │
-│  • Port: Auto-assigned by Railway                          │
-│  • Health: /health (API) and / (Frontend)                 │
-│  • Single URL for entire application                       │
+│  🌐 Web Service (Next.js/React)                           │
+│  • Source: app/web/                                        │
+│  • Port: 3000 (auto-assigned)                             │
+│  • Health: /                                               │
+│  • Frontend: Draft board, league selector, real-time UI   │
+├─────────────────────────────────────────────────────────────┤
+│  📡 API Service (Python/FastAPI)                          │
+│  • Source: app/api/                                        │
+│  • Port: 8000 (auto-assigned)                             │
+│  • Health: /health                                         │
+│  • Endpoints: /discover, /drafts, /recommend, etc.        │
+├─────────────────────────────────────────────────────────────┤
+│  🗄️ Database Service (PostgreSQL)                          │
+│  • Auto-provisioned by Railway                            │
+│  • Optimized for fast queries                             │
+│  • Purpose: Draft state, player rankings, user data       │
+├─────────────────────────────────────────────────────────────┤
+│  🤖 AI Service (OpenAI Integration)                       │
+│  • Async processing for recommendations                   │
+│  • Queue-based system                                     │
+│  • Non-blocking during draft decisions                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ## 🚀 **How Auto-Deployment Works**
 
 ### 1. **Service Detection**
-Railway automatically detects your project based on:
-- **`railway.json`** - Main configuration
-- **`nixpacks.toml`** - Build and runtime configuration
-- **Directory structure** - `app/api/` and `app/web/`
+Railway automatically detects multiple services based on:
+- **`railway.json`** - Defines service structure
+- **`app/web/nixpacks.toml`** - Next.js web configuration
+- **`app/api/nixpacks.toml`** - Python API configuration
+- **Directory structure** - `app/web/` and `app/api/`
 
 ### 2. **Automatic Build Process**
 ```
 Railway scans repo
     ↓
-Detects unified service
+Detects 4 services
     ↓
-Installs Python + Node.js dependencies
+Builds each service independently
     ↓
-Builds Next.js frontend
+Deploys all services
     ↓
-Deploys unified service
+Generates URLs for each
     ↓
-Generates single URL
-    ↓
-API and frontend accessible from same domain
+Sets up inter-service communication
 ```
 
 ### 3. **Service Communication**
-- **Frontend → Backend**: Both served from same domain
-- **API endpoints**: `/api/*` routes
-- **Frontend routes**: All other routes
-- **Unified deployment**: Single service, single URL
+- **Web → API**: Frontend calls backend via environment variables
+- **API → Database**: Direct database connections
+- **API → AI**: Async queue-based communication
+- **Auto-discovery**: Railway provides service URLs automatically
 
 ## 🔧 **Deployment Steps**
 
@@ -55,84 +69,105 @@ API and frontend accessible from same domain
 2. **Go to [railway.app](https://railway.app)**
 3. **New Project** → "Deploy from GitHub repo"
 4. **Select your repository**
-5. **Railway auto-detects and deploys**
+5. **Railway auto-detects all services**
 
 ### **Step 2: Configure Environment Variables**
-In Railway project → Variables tab:
+Railway will create a project with multiple services. Set these variables:
 
+#### **Web Service Variables:**
 ```
-OPENAI_API_KEY=your_key_here
-ALLOWED_ORIGINS=https://your-domain.railway.app
-SLEEPER_BASE_URL=https://api.sleeper.app
-CACHE_TTL_SECONDS=300
-OPENAI_MODEL=gpt-4o-mini
+NEXT_PUBLIC_API_URL=https://your-api-domain.railway.app
 NODE_ENV=production
 ```
 
-### **Step 3: Get Your URL**
+#### **API Service Variables:**
+```
+OPENAI_API_KEY=your_openai_api_key_here
+ALLOWED_ORIGINS=https://your-web-domain.railway.app
+SLEEPER_BASE_URL=https://api.sleeper.app
+CACHE_TTL_SECONDS=300
+OPENAI_MODEL=gpt-4o-mini
+DATABASE_URL=your_postgresql_connection_string
+REDIS_URL=your_redis_connection_string
+```
+
+### **Step 3: Get Service URLs**
 After deployment, Railway will provide:
-- **Single URL**: `https://your-app.railway.app`
-- **API endpoints**: `https://your-app.railway.app/health`, `/discover`, etc.
-- **Frontend**: `https://your-app.railway.app/` (main app)
+- **Web URL**: `https://your-web.railway.app`
+- **API URL**: `https://your-api.railway.app`
+- **Health endpoints**: `/` (Web) and `/health` (API)
 
 ## 🔄 **Service Updates**
 
 ### **Automatic Updates**
-- **Push to GitHub** → Service auto-updates
-- **Unified scaling** → Single service scales based on total traffic
-- **Health monitoring** → Combined health checks
+- **Push to GitHub** → All services auto-update
+- **Independent scaling** → Each service scales based on its own traffic
+- **Health monitoring** → Each service has independent health checks
 
 ### **Manual Updates**
-- **Redeploy** → Update entire service
-- **Rollback** → Revert to previous version
-- **Environment variables** → Update as needed
+- **Individual service redeploy** → Update just one service
+- **Rollback** → Revert specific service to previous version
+- **Environment variables** → Update per service
 
 ## 📊 **Monitoring & Scaling**
 
-### **Unified Monitoring**
-- **API requests**: Backend performance and errors
-- **Frontend**: Build logs and runtime errors
-- **Overall service**: Combined metrics and scaling
+### **Per-Service Monitoring**
+- **Web Service**: Build logs, frontend errors, performance
+- **API Service**: Request logs, response times, error rates
+- **Database Service**: Query performance, connection pools
+- **AI Service**: Processing times, queue status
 
 ### **Auto-Scaling**
-- **Unified scaling** → Scales based on total traffic
-- **Resource optimization** → Shared resources between frontend/backend
-- **Cost efficiency** → Single service pricing
+- **Web**: Scales based on frontend traffic
+- **API**: Scales based on HTTP request volume
+- **Database**: Scales based on query load
+- **AI**: Scales based on recommendation queue
 
 ## 🚫 **Common Issues & Solutions**
 
+### **Service Not Detected**
+- Check `railway.json` syntax
+- Verify directory structure
+- Ensure `nixpacks.toml` files exist in each service directory
+
 ### **Build Failures**
-- **Python dependencies**: Check `app/api/requirements.txt`
-- **Node.js build**: Check `app/web/package.json`
-- **Port conflicts**: Railway auto-assigns ports
+- **Web**: Check `package.json` and Node.js version
+- **API**: Check `requirements.txt` and Python version
+- **Database**: Check connection strings and credentials
 
 ### **Service Communication**
-- **API routes**: Ensure they start with `/api/` or are properly configured
-- **Frontend routing**: Check Next.js configuration
-- **CORS**: Verify ALLOWED_ORIGINS includes your domain
+- Verify environment variables are set
+- Check CORS settings in API
+- Ensure service URLs are correct
 
 ## 🎯 **What Happens After Deployment**
 
-1. **Railway creates 1 unified service** automatically
-2. **Service includes both API and frontend** from single URL
-3. **API endpoints work** at `/health`, `/discover`, etc.
-4. **Frontend accessible** at the root domain
-5. **Unified monitoring** and scaling
+1. **Railway creates 4 services** automatically
+2. **Each service gets its own URL** and monitoring
+3. **Services can communicate** via environment variables
+4. **Auto-scaling** based on individual service traffic
+5. **Unified project dashboard** for managing all services
 
-## 🔮 **Future Database Service**
+## 🔮 **Database & AI Services**
 
-When you add a database:
-1. **Create database configuration** in Railway
-2. **Add connection variables** to environment
-3. **Database runs separately** but connects to your unified service
-4. **Auto-provisions** database resources
+### **Database Service**
+- **Auto-provisioned** by Railway
+- **PostgreSQL** with connection pooling
+- **Optimized indexes** for fast queries
+- **Read replicas** for performance
+
+### **AI Service**
+- **Async processing** - never blocks drafts
+- **Queue system** for recommendations
+- **Cached results** for similar situations
+- **Fallback logic** if AI is slow
 
 ## 📞 **Support**
 
 - **Railway Docs**: [docs.railway.app](https://docs.railway.app)
-- **Nixpacks Docs**: [nixpacks.com](https://nixpacks.com)
+- **Multi-service Guide**: [railway.app/docs/deploy/deployments/multi-service](https://railway.app/docs/deploy/deployments/multi-service)
 - **Discord**: [discord.gg/railway](https://discord.gg/railway)
 
 ---
 
-**Result**: 1 unified service, 1 deployment, full automation! 🚀
+**Result**: 4 separate services, 1 deployment, full automation, optimal performance! 🚀
