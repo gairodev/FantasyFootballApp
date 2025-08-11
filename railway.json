@@ -1,29 +1,11 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
-  "services": [
-    {
-      "name": "api",
-      "source": "app/api",
-      "build": {
-        "builder": "NIXPACKS"
-      },
-      "deploy": {
-        "startCommand": "python main.py",
-        "healthcheckPath": "/health",
-        "healthcheckTimeout": 300
-      }
-    },
-    {
-      "name": "web",
-      "source": "app/web",
-      "build": {
-        "builder": "NIXPACKS"
-      },
-      "deploy": {
-        "startCommand": "npm start",
-        "healthcheckPath": "/",
-        "healthcheckTimeout": 300
-      }
-    }
-  ]
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "cd app/api && python main.py",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300
+  }
 }

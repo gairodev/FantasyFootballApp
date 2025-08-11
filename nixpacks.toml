@@ -1,0 +1,17 @@
+[phases.setup]
+nixPkgs = ["python311", "python311Packages.pip", "nodejs18", "npm"]
+
+[phases.install]
+cmds = [
+  "pip install -r app/api/requirements.txt",
+  "cd app/web && npm install"
+]
+
+[phases.build]
+cmds = [
+  "cd app/web && npm run build",
+  "echo 'Full-stack build complete'"
+]
+
+[start]
+cmd = "cd app/api && python main.py"
