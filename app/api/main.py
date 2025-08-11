@@ -28,6 +28,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+
 # Configuration
 SLEEPER_BASE = os.getenv("SLEEPER_BASE_URL", "https://api.sleeper.app")
 CACHE_TTL = int(os.getenv("CACHE_TTL_SECONDS", "3"))

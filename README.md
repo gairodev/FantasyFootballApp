@@ -34,19 +34,24 @@ An intelligent fantasy football draft assistant that combines deterministic VORP
 - Node.js 18+
 - OpenAI API key (optional, for AI recommendations)
 
-### 🚂 Railway Deployment
+### 🚂 Railway Deployment (Multi-Service)
 
-For quick deployment to Railway (recommended):
+For automatic deployment of all services to Railway:
 
 1. **Fork/Clone** this repository to your GitHub account
 2. **Connect to Railway**: Go to [railway.app](https://railway.app) and deploy from GitHub
-3. **Configure Environment Variables** (see [DEPLOYMENT.md](./DEPLOYMENT.md) for details)
-4. **Deploy**: Railway will automatically build and deploy both services
+3. **Railway auto-detects** and deploys all services automatically:
+   - 📡 **API Service** (Python/FastAPI)
+   - 🌐 **Web Service** (Next.js/React)  
+   - 🗄️ **Database Service** (when added)
+4. **Configure Environment Variables** per service
+5. **Deploy**: All services deploy simultaneously
 
-**Deployment Time**: ~5-10 minutes
-**Cost**: Free tier available for development
+**Deployment Time**: ~10-15 minutes  
+**Cost**: Free tier available for development  
+**Services**: 3 separate, independently scalable services
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
+See [MULTI_SERVICE_DEPLOYMENT.md](./MULTI_SERVICE_DEPLOYMENT.md) for detailed deployment instructions.
 
 ### 1. Clone and Setup
 
