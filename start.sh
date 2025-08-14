@@ -86,3 +86,4 @@ echo "Press Ctrl+C to stop all services"
 # Wait for both processes
 wait
 
+

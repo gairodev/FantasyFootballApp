@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import httpx
 import os
@@ -9,6 +8,19 @@ from dotenv import load_dotenv
 import time
 import json
 import asyncio
+
+# Import database and models
+from database import init_database, test_connection, close_database_pool
+from models import (
+    RecommendationRequest, RecommendationResponse, DiscoverResponse,
+    DraftsResponse, PicksResponse, PlayersResponse
+)
+from db_operations import (
+    create_user, create_or_update_league, create_user_league,
+    create_or_update_draft, create_pick, bulk_create_picks,
+    create_or_update_player, bulk_create_or_update_players,
+    get_all_players, create_recommendation
+)
 
 # Load environment variables
 load_dotenv()
@@ -28,27 +40,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
 # Configuration
 SLEEPER_BASE = os.getenv("SLEEPER_BASE_URL", "https://api.sleeper.app")
 CACHE_TTL = int(os.getenv("CACHE_TTL_SECONDS", "3"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-# Simple in-memory cache
+# Simple in-memory cache (keeping for API responses, database for persistent data)
 cache = {}
-
-class RecommendationRequest(BaseModel):
-    draft_id: str
-    team_on_clock: str
-    strategy: Optional[str] = "balanced"
-
-class RecommendationResponse(BaseModel):
-    ranked: List[dict]
-    generated_at: int
-    strategy: str
-    llm_enabled: bool
 
 def get_cache_key(endpoint: str, params: dict) -> str:
     """Generate cache key for endpoint and parameters"""
@@ -68,6 +67,25 @@ def set_cache(key: str, data: any):
     """Set data in cache with current timestamp"""
     cache[key] = (data, time.time())
 
+# Database initialization
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup"""
+    try:
+        await init_database()
+        # Test database connection
+        if await test_connection():
+            print("✅ Database connection successful")
+        else:
+            print("❌ Database connection failed")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up database connections on shutdown"""
+    await close_database_pool()
+
 async def get_players_with_cache() -> Dict[str, Any]:
     """Get players with longer cache for ranking calculations"""
     cache_key = "players:ranking"
@@ -76,16 +94,65 @@ async def get_players_with_cache() -> Dict[str, Any]:
         return cached
 
     try:
+        # Try to get players from database first
+        db_players = await get_all_players()
+        if db_players:
+            # Convert to the format expected by the frontend
+            players_dict = {}
+            for player_id, player in db_players.items():
+                players_dict[player_id] = {
+                    "player_id": player.player_id,
+                    "full_name": player.full_name,
+                    "pos": player.pos,
+                    "team": player.team,
+                    "adp": float(player.adp) if player.adp else None,
+                    "tier": player.tier,
+                    "projection_baseline": float(player.projection_baseline) if player.projection_baseline else None,
+                    "bye_week": player.bye_week,
+                    "injury_status": player.injury_status,
+                    "news": player.news,
+                    **player.metadata if player.metadata else {}
+                }
+            
+            result = {"players": players_dict}
+            cache[cache_key] = (result, time.time())
+            return result
+
+        # Fallback to Sleeper API if database is empty
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(f"{SLEEPER_BASE}/v1/players/nfl")
             if not response.is_success:
                 raise HTTPException(status_code=500, detail="Failed to fetch NFL players")
             
             players = response.json()
-            result = {"players": players}
             
-            # Cache players for 1 hour for ranking calculations
-            cache["players:ranking"] = (result, time.time())
+            # Store players in database for future use
+            try:
+                from models import DatabasePlayer
+                player_models = []
+                for player_id, player_data in players.items():
+                    if isinstance(player_data, dict) and 'full_name' in player_data:
+                        player_models.append(DatabasePlayer(
+                            player_id=player_id,
+                            full_name=player_data.get('full_name', ''),
+                            pos=player_data.get('pos'),
+                            team=player_data.get('team'),
+                            adp=player_data.get('adp'),
+                            tier=player_data.get('tier'),
+                            projection_baseline=player_data.get('projection_baseline'),
+                            bye_week=player_data.get('bye_week'),
+                            injury_status=player_data.get('injury_status'),
+                            news=player_data.get('news'),
+                            metadata=player_data
+                        ))
+                
+                if player_models:
+                    await bulk_create_or_update_players(player_models)
+            except Exception as e:
+                print(f"Warning: Failed to store players in database: {e}")
+            
+            result = {"players": players}
+            cache[cache_key] = (result, time.time())
             return result
 
     except httpx.TimeoutException:
@@ -122,11 +189,11 @@ def calculate_deterministic_rankings(
     # Filter remaining players
     remaining_players = []
     for player_id, player_data in players.items():
-        if player_id not in drafted_ids and player_data.get("position") in ["QB", "RB", "WR", "TE"]:
+        if player_id not in drafted_ids and player_data.get("pos") in ["QB", "RB", "WR", "TE"]:
             remaining_players.append({
                 "player_id": player_id,
-                "full_name": player_data.get("full_name", player_data.get("name", "Unknown")),
-                "pos": player_data.get("position", "UNK"),
+                "full_name": player_data.get("full_name", "Unknown"),
+                "pos": player_data.get("pos", "UNK"),
                 "team": player_data.get("team"),
                 "adp": player_data.get("adp"),
                 "tier": player_data.get("tier"),

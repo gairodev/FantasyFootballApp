@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Clock, Users, Target, TrendingUp, Shield, Zap, AlertCircle, CheckCircle } from 'lucide-react';
+import { Clock, Users, Target, TrendingUp, Shield, Zap, AlertCircle, CheckCircle, RefreshCw, Play, Pause, Trophy } from 'lucide-react';
 import { Draft, League, Pick, Player, Recommendation, Strategy } from '../types';
 
 interface DraftBoardProps {
@@ -126,12 +126,12 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
 
   const getFitColor = (fit: string) => {
     switch (fit) {
-      case 'need': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'upside': return 'bg-green-100 text-green-800 border-green-200';
-      case 'safe': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'value': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'stack': return 'bg-orange-100 text-orange-800 border-orange-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'need': return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+      case 'upside': return 'bg-green-500/20 text-green-300 border-green-500/30';
+      case 'safe': return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
+      case 'value': return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+      case 'stack': return 'bg-orange-500/20 text-orange-300 border-orange-500/30';
+      default: return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
     }
   };
 
@@ -155,108 +155,133 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Draft Header */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="sleeper-card p-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-3xl font-bold text-white mb-2">
               {league.name} - Draft
             </h2>
-            <p className="text-gray-600">
-              {draft.type === 'snake' ? 'Snake Draft' : draft.type} • {draft.settings?.rounds || 15} rounds
-            </p>
+            <div className="flex items-center space-x-3">
+              <div className="px-3 py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-full text-sm font-medium text-purple-300">
+                {draft.type === 'snake' ? 'Snake Draft' : draft.type}
+              </div>
+              <div className="px-3 py-1 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-full text-sm font-medium text-blue-300">
+                {draft.settings?.rounds || 15} rounds
+              </div>
+            </div>
           </div>
           
           <div className="text-right">
-            <div className="text-2xl font-bold text-primary-600">
+            <div className="text-4xl font-bold gradient-text mb-1">
               Pick {currentPick}
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="text-white/60">
               Round {currentRound}, Pick {pickInRound}
             </div>
           </div>
         </div>
 
         {/* Strategy Selector */}
-        <div className="flex items-center space-x-4">
-          <span className="text-sm font-medium text-gray-700">Strategy:</span>
-          <div className="flex space-x-2">
-            {(['safe', 'balanced', 'upside'] as Strategy[]).map((strat) => (
-              <button
-                key={strat}
-                onClick={() => setStrategy(strat)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  strategy === strat
-                    ? 'bg-primary-100 text-primary-800 border border-primary-300'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {getStrategyIcon(strat)}
-                <span className="capitalize">{strat}</span>
-              </button>
-            ))}
+        <div className="space-y-4">
+          <div className="flex items-center space-x-4">
+            <span className="text-white/80 font-medium">Strategy:</span>
+            <div className="flex space-x-3">
+              {(['safe', 'balanced', 'upside'] as Strategy[]).map((strat) => (
+                <button
+                  key={strat}
+                  onClick={() => setStrategy(strat)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
+                    strategy === strat
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20 border border-white/20'
+                  }`}
+                >
+                  {getStrategyIcon(strat)}
+                  <span className="capitalize">{strat}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        
-        <div className="mt-2 text-xs text-gray-500">
-          {getStrategyDescription(strategy)}
+          
+          <div className="text-white/60 text-sm">
+            {getStrategyDescription(strategy)}
+          </div>
         </div>
 
         {/* AI Status */}
-        <div className="mt-3 flex items-center space-x-2">
+        <div className="mt-6 flex items-center space-x-3 p-4 bg-white/5 rounded-xl border border-white/10">
           {llmEnabled ? (
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <div className="w-8 h-8 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-lg flex items-center justify-center">
+              <CheckCircle className="h-5 w-5 text-green-400" />
+            </div>
           ) : (
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <div className="w-8 h-8 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg flex items-center justify-center">
+              <AlertCircle className="h-5 w-5 text-yellow-400" />
+            </div>
           )}
-          <span className="text-xs text-gray-600">
-            {llmEnabled ? 'AI-powered recommendations enabled' : 'Deterministic rankings only (OpenAI not configured)'}
-          </span>
+          <div>
+            <div className="text-white font-medium">
+              {llmEnabled ? 'AI-powered recommendations enabled' : 'Deterministic rankings only'}
+            </div>
+            <div className="text-white/60 text-sm">
+              {llmEnabled ? 'OpenAI integration active' : 'OpenAI not configured'}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Recent Picks */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-              <Clock className="h-5 w-5" />
+          <div className="sleeper-card p-6">
+            <h3 className="text-xl font-semibold text-white mb-6 flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-lg flex items-center justify-center">
+                <Clock className="h-5 w-5 text-blue-400" />
+              </div>
               <span>Recent Picks</span>
             </h3>
             
             {picks.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No picks yet - draft hasn't started
+              <div className="text-center py-12 text-white/50">
+                <Clock className="h-16 w-16 mx-auto mb-4 text-white/30" />
+                <p className="text-lg">No picks yet - draft hasn't started</p>
+                <p className="text-sm text-white/40">Picks will appear here as the draft progresses</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {picks.slice(-10).reverse().map((pick) => (
-                  <div key={pick.pick_no} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                    <div className="flex items-center space-x-3">
-                      <div className="text-sm font-medium text-gray-900">
-                        #{pick.pick_no}
+                {picks.slice(-10).reverse().map((pick, index) => (
+                  <div key={pick.pick_no} className="group p-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-purple-500/30 transition-all duration-300">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-8 h-8 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center text-sm font-bold text-white">
+                          #{pick.pick_no}
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-white font-medium">
+                            {getPlayerName(pick.player_id)}
+                          </div>
+                          <div className="flex items-center space-x-3 text-sm text-white/60">
+                            <span>Round {pick.round}, Pick {pick.pick}</span>
+                            <span>Team {pick.roster_id}</span>
+                            <span className="px-2 py-1 bg-white/10 rounded-full text-xs">
+                              {getPlayerPosition(pick.player_id)}
+                              {getPlayerTeam(pick.player_id) && ` • ${getPlayerTeam(pick.player_id)}`}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Round {pick.round}, Pick {pick.pick}
+                      <div className="text-white/50 text-sm">
+                        {formatTime(pick.timestamp)}
                       </div>
-                      <div className="text-sm font-medium text-gray-900">
-                        Team {pick.roster_id}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {getPlayerName(pick.player_id)} ({getPlayerPosition(pick.player_id)})
-                        {getPlayerTeam(pick.player_id) && ` - ${getPlayerTeam(pick.player_id)}`}
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {formatTime(pick.timestamp)}
                     </div>
                   </div>
                 ))}
               </div>
             )}
             
-            <div className="mt-4 text-xs text-gray-500 text-center">
+            <div className="mt-6 text-center text-white/40 text-sm">
               Last updated: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : 'Never'}
             </div>
           </div>
@@ -264,47 +289,66 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
 
         {/* Recommendations */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-              <Target className="h-5 w-5" />
+          <div className="sleeper-card p-6">
+            <h3 className="text-xl font-semibold text-white mb-6 flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-lg flex items-center justify-center">
+                <Target className="h-5 w-5 text-green-400" />
+              </div>
               <span>Top Picks</span>
             </h3>
             
             {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500"></div>
               </div>
             ) : recommendations.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {recommendations.slice(0, 8).map((rec, index) => (
-                  <div key={rec.player_id} className="p-3 border rounded-md hover:shadow-sm transition-shadow">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="font-medium text-gray-900">
-                        {index + 1}. {getPlayerName(rec.player_id)}
+                  <div key={rec.player_id} className="group p-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-purple-500/30 transition-all duration-300">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-6 h-6 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center text-xs font-bold text-white">
+                          {index + 1}
+                        </div>
+                        <div className="font-semibold text-white group-hover:text-purple-300 transition-colors">
+                          {getPlayerName(rec.player_id)}
+                        </div>
                       </div>
                       <div className={`text-xs px-2 py-1 rounded-full border ${getFitColor(rec.fit)}`}>
                         {rec.fit}
                       </div>
                     </div>
                     
-                    <div className="text-sm text-gray-600 mb-2">
+                    <div className="text-white/70 text-sm mb-3">
                       {rec.reason}
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-2">
-                      <div>VORP: {rec.vorp?.toFixed(1) || 'N/A'}</div>
-                      <div>ADP: {rec.adp_discount?.toFixed(1) || 'N/A'}</div>
-                      <div>Need: {rec.need_boost?.toFixed(1) || 'N/A'}</div>
-                      <div>Scarcity: {rec.scarcity_boost?.toFixed(1) || 'N/A'}</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-white/50 mb-3">
+                      <div className="flex items-center space-x-1">
+                        <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                        <span>VORP: {rec.vorp?.toFixed(1) || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                        <span>ADP: {rec.adp_discount?.toFixed(1) || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>
+                        <span>Need: {rec.need_boost?.toFixed(1) || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
+                        <span>Scarcity: {rec.scarcity_boost?.toFixed(1) || 'N/A'}</span>
+                      </div>
                     </div>
                     
                     {rec.edge_vs_next > 0 && (
-                      <div className="text-xs text-green-600 font-medium">
+                      <div className="text-xs text-green-400 font-medium mb-2">
                         +{rec.edge_vs_next.toFixed(1)} vs next best
                       </div>
                     )}
                     
-                    <div className="text-xs text-gray-400 mt-2">
+                    <div className="text-xs text-white/40">
                       {getPlayerPosition(rec.player_id)}
                       {getPlayerTeam(rec.player_id) && ` • ${getPlayerTeam(rec.player_id)}`}
                     </div>
@@ -312,17 +356,24 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                No recommendations available
+              <div className="text-center py-12 text-white/50">
+                <Target className="h-16 w-16 mx-auto mb-4 text-white/30" />
+                <p>No recommendations available</p>
+                <p className="text-sm text-white/40">Select a strategy to get started</p>
               </div>
             )}
             
             {teamOnClock && (
-              <div className="mt-4 p-3 bg-primary-50 rounded-md">
-                <div className="text-sm font-medium text-primary-900">
-                  Team {teamOnClock} is on the clock
+              <div className="mt-6 p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
+                <div className="flex items-center space-x-3 mb-2">
+                  <div className="w-6 h-6 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg flex items-center justify-center">
+                    <Play className="h-4 w-4 text-yellow-400" />
+                  </div>
+                  <div className="text-white font-semibold">
+                    Team {teamOnClock} is on the clock
+                  </div>
                 </div>
-                <div className="text-xs text-primary-600 mt-1">
+                <div className="text-white/60 text-sm">
                   Pick {currentPick} • Round {currentRound}
                 </div>
               </div>
@@ -332,9 +383,19 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
             <button
               onClick={fetchRecommendations}
               disabled={isLoading || !teamOnClock}
-              className="w-full mt-4 py-2 px-4 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full mt-6 py-3 px-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium flex items-center justify-center space-x-2"
             >
-              {isLoading ? 'Refreshing...' : 'Refresh Recommendations'}
+              {isLoading ? (
+                <>
+                  <RefreshCw className="h-5 w-5 animate-spin" />
+                  <span>Refreshing...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-5 w-5" />
+                  <span>Refresh Recommendations</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -342,10 +403,12 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="h-5 w-5 text-red-600" />
-            <div className="text-red-800 text-sm">{error}</div>
+        <div className="sleeper-card p-6 border-red-500/30 bg-red-500/10">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
+              <AlertCircle className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="text-red-300 text-sm">{error}</div>
           </div>
         </div>
       )}
