@@ -111,7 +111,8 @@ async def get_players_with_cache() -> Dict[str, Any]:
                     "bye_week": player.bye_week,
                     "injury_status": player.injury_status,
                     "news": player.news,
-                    **player.metadata if player.metadata else {}
+                    # Safely merge optional metadata dict
+                    **(player.metadata or {})
                 }
             
             result = {"players": players_dict}
