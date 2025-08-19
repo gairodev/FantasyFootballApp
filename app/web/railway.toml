@@ -2,9 +2,10 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "npm start"
+startCommand = "npm run start -- -p $PORT -H 0.0.0.0"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 
 [env]
 NODE_ENV = "production"
+HOST = "0.0.0.0"
