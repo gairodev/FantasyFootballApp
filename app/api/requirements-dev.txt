@@ -1,0 +1,6 @@
+pytest>=7.4
+httpx>=0.25.2
+pytest-asyncio>=0.23
+fastapi>=0.104.1
+
+
