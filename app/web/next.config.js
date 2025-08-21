@@ -1,11 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    // For Railway deployment, we need to use the public URL, not internal hostname
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    
-    // If we're in Railway and have a public URL, use it
-    if (apiUrl && !apiUrl.includes('railway.internal')) {
+    // Normalize API URL and allow internal Railway domains
+    const apiUrlRaw = process.env.NEXT_PUBLIC_API_URL;
+    if (apiUrlRaw) {
+      const apiUrl = apiUrlRaw.startsWith('http') ? apiUrlRaw : `http://${apiUrlRaw}`;
       return [
         {
           source: '/api/:path*',
@@ -13,7 +12,7 @@ const nextConfig = {
         },
       ];
     }
-    
+
     // Fallback to localhost for local development
     return [
       {
