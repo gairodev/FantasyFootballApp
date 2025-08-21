@@ -15,7 +15,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/.next ./.next
-COPY --from=build /app/public ./public 2>/dev/null || true
+# Create an empty public dir if none exists in the project
+RUN mkdir -p ./public
 COPY package.json ./
 COPY --from=build /app/node_modules ./node_modules
 EXPOSE 3000
