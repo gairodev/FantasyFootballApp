@@ -397,6 +397,9 @@ async def discover(
 
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Sleeper API timeout")
+    except HTTPException as e:
+        # Re-raise explicit HTTP errors (e.g., 404)
+        raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error discovering user: {str(e)}")
 
@@ -426,6 +429,8 @@ async def get_drafts(
 
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Sleeper API timeout")
+    except HTTPException as e:
+        raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching drafts: {str(e)}")
 
@@ -456,6 +461,8 @@ async def get_picks(
 
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Sleeper API timeout")
+    except HTTPException as e:
+        raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching picks: {str(e)}")
 
@@ -484,6 +491,8 @@ async def get_players():
 
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Sleeper API timeout")
+    except HTTPException as e:
+        raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching players: {str(e)}")
 

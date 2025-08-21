@@ -7,17 +7,16 @@ client = TestClient(app)
 
 
 def test_discover_user_not_found(monkeypatch):
-    # Mock Sleeper user endpoint 404
-    def fake_get(url, *args, **kwargs):  # type: ignore
+    # First call returns a user without user_id → API should return 404
+    async def fake_get(self, url, *args, **kwargs):  # type: ignore
         class Resp:
-            status_code = 404
-            is_success = False
+            is_success = True
             def json(self):
-                return {"detail": "not found"}
+                return {}
         return Resp()
 
     import httpx
-    monkeypatch.setattr(httpx.AsyncClient, "get", lambda self, url, *a, **k: fake_get(url, *a, **k))
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
 
     resp = client.get("/discover", params={"username": "nope", "season": "2024"})
     assert resp.status_code == 404
@@ -33,7 +32,9 @@ def test_players_success(monkeypatch):
             return players_payload
 
     import httpx
-    monkeypatch.setattr(httpx.AsyncClient, "get", lambda self, url, *a, **k: Resp())
+    async def fake_get(self, url, *a, **k):  # type: ignore
+        return Resp()
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
 
     resp = client.get("/players")
     assert resp.status_code == 200
@@ -50,7 +51,9 @@ def test_get_drafts_success(monkeypatch):
             return drafts_payload
 
     import httpx
-    monkeypatch.setattr(httpx.AsyncClient, "get", lambda self, url, *a, **k: Resp())
+    async def fake_get(self, url, *a, **k):  # type: ignore
+        return Resp()
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
 
     resp = client.get("/drafts", params={"league_id": "L1"})
     assert resp.status_code == 200
@@ -66,7 +69,9 @@ def test_get_picks_success(monkeypatch):
             return picks_payload
 
     import httpx
-    monkeypatch.setattr(httpx.AsyncClient, "get", lambda self, url, *a, **k: Resp())
+    async def fake_get(self, url, *a, **k):  # type: ignore
+        return Resp()
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
 
     resp = client.get("/picks", params={"draft_id": "D1"})
     assert resp.status_code == 200

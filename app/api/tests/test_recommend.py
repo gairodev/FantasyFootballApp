@@ -7,7 +7,9 @@ client = TestClient(app)
 
 def test_recommend_with_mocked_dependencies(monkeypatch):
     # Mock picks endpoint call used inside get_recommendations
-    monkeypatch.setattr("main.get_picks", lambda draft_id: {"picks": []})
+    async def fake_get_picks(draft_id):
+        return {"picks": []}
+    monkeypatch.setattr("main.get_picks", lambda draft_id: fake_get_picks(draft_id))
 
     # Mock players cache to return minimal structure
     async def fake_players_with_cache():
