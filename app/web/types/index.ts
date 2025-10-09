@@ -53,6 +53,13 @@ export interface Player {
   [key: string]: any;
 }
 
+export interface PlayerSyncStatus {
+  last_attempt?: number | null;
+  last_synced?: number | null;
+  last_error?: string | null;
+  interval_seconds?: number;
+}
+
 export interface Roster {
   roster_id: number;
   owner_id: string;

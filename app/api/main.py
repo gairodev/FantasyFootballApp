@@ -1,13 +1,12 @@
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import httpx
 import os
 from dotenv import load_dotenv
 import time
 import json
-import asyncio
 
 # Import database and models
 from database import init_database, test_connection, close_database_pool
@@ -18,8 +17,11 @@ from models import (
 from db_operations import (
     create_user, create_or_update_league, create_user_league,
     create_or_update_draft, create_pick, bulk_create_picks,
-    create_or_update_player, bulk_create_or_update_players,
-    get_all_players, create_recommendation
+    create_recommendation
+)
+from player_sync import (
+    ensure_players_loaded, get_sync_status, start_periodic_sync,
+    stop_periodic_sync, sync_players
 )
 
 # Load environment variables
@@ -42,12 +44,13 @@ app.add_middleware(
 
 # Configuration
 SLEEPER_BASE = os.getenv("SLEEPER_BASE_URL", "https://api.sleeper.app")
-CACHE_TTL = int(os.getenv("CACHE_TTL_SECONDS", "3"))
+CACHE_TTL = int(os.getenv("CACHE_TTL_SECONDS", "60"))
+PLAYER_CACHE_TTL = int(os.getenv("PLAYER_CACHE_TTL_SECONDS", "21600"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # Simple in-memory cache (keeping for API responses, database for persistent data)
-cache = {}
+cache: Dict[str, Tuple[Any, float, Optional[int]]] = {}
 
 def get_cache_key(endpoint: str, params: dict) -> str:
     """Generate cache key for endpoint and parameters"""
@@ -56,16 +59,17 @@ def get_cache_key(endpoint: str, params: dict) -> str:
 def get_from_cache(key: str):
     """Get data from cache if not expired"""
     if key in cache:
-        data, timestamp = cache[key]
-        if time.time() - timestamp < CACHE_TTL:
+        data, timestamp, ttl = cache[key]
+        ttl_seconds = ttl if ttl is not None else CACHE_TTL
+        if ttl_seconds <= 0 or time.time() - timestamp < ttl_seconds:
             return data
-        else:
-            del cache[key]
+        del cache[key]
     return None
 
-def set_cache(key: str, data: any):
+
+def set_cache(key: str, data: Any, ttl: Optional[int] = None):
     """Set data in cache with current timestamp"""
-    cache[key] = (data, time.time())
+    cache[key] = (data, time.time(), ttl)
 
 # Database initialization
 @app.on_event("startup")
@@ -78,12 +82,18 @@ async def startup_event():
             print("✅ Database connection successful")
         else:
             print("❌ Database connection failed")
+        try:
+            await ensure_players_loaded()
+        except Exception as sync_error:
+            print(f"⚠️ Initial player sync failed: {sync_error}")
+        start_periodic_sync()
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up database connections on shutdown"""
+    await stop_periodic_sync()
     await close_database_pool()
 
 async def get_players_with_cache() -> Dict[str, Any]:
@@ -94,68 +104,10 @@ async def get_players_with_cache() -> Dict[str, Any]:
         return cached
 
     try:
-        # Try to get players from database first
-        db_players = await get_all_players()
-        if db_players:
-            # Convert to the format expected by the frontend
-            players_dict = {}
-            for player_id, player in db_players.items():
-                players_dict[player_id] = {
-                    "player_id": player.player_id,
-                    "full_name": player.full_name,
-                    "pos": player.pos,
-                    "team": player.team,
-                    "adp": float(player.adp) if player.adp else None,
-                    "tier": player.tier,
-                    "projection_baseline": float(player.projection_baseline) if player.projection_baseline else None,
-                    "bye_week": player.bye_week,
-                    "injury_status": player.injury_status,
-                    "news": player.news,
-                    # Safely merge optional metadata dict
-                    **(player.metadata or {})
-                }
-            
-            result = {"players": players_dict}
-            cache[cache_key] = (result, time.time())
-            return result
-
-        # Fallback to Sleeper API if database is empty
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{SLEEPER_BASE}/v1/players/nfl")
-            if not response.is_success:
-                raise HTTPException(status_code=500, detail="Failed to fetch NFL players")
-            
-            players = response.json()
-            
-            # Store players in database for future use
-            try:
-                from models import DatabasePlayer
-                player_models = []
-                for player_id, player_data in players.items():
-                    if isinstance(player_data, dict) and 'full_name' in player_data:
-                        player_models.append(DatabasePlayer(
-                            player_id=player_id,
-                            full_name=player_data.get('full_name', ''),
-                            pos=player_data.get('pos'),
-                            team=player_data.get('team'),
-                            adp=player_data.get('adp'),
-                            tier=player_data.get('tier'),
-                            projection_baseline=player_data.get('projection_baseline'),
-                            bye_week=player_data.get('bye_week'),
-                            injury_status=player_data.get('injury_status'),
-                            news=player_data.get('news'),
-                            metadata=player_data
-                        ))
-                
-                if player_models:
-                    await bulk_create_or_update_players(player_models)
-            except Exception as e:
-                print(f"Warning: Failed to store players in database: {e}")
-            
-            result = {"players": players}
-            cache[cache_key] = (result, time.time())
-            return result
-
+        players = await ensure_players_loaded()
+        result = {"players": players}
+        set_cache(cache_key, result, ttl=PLAYER_CACHE_TTL)
+        return result
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Sleeper API timeout")
     except Exception as e:
@@ -477,24 +429,42 @@ async def get_players():
         return cached
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{SLEEPER_BASE}/v1/players/nfl")
-            if not response.is_success:
-                raise HTTPException(status_code=500, detail="Failed to fetch NFL players")
-            
-            players = response.json()
-            result = {"players": players}
-            
-            # Long cache for players (24 hours)
-            cache["players"] = (result, time.time())
-            return result
-
+        players = await ensure_players_loaded()
+        result = {"players": players}
+        set_cache(cache_key, result, ttl=PLAYER_CACHE_TTL)
+        return result
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Sleeper API timeout")
     except HTTPException as e:
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching players: {str(e)}")
+
+
+@app.post("/players/sync")
+async def trigger_player_sync(force: bool = Query(False, description="Force refresh from Sleeper")):
+    try:
+        result = await sync_players(force=force)
+        payload = {"players": result["players"]}
+        set_cache(get_cache_key("players", {}), payload, ttl=PLAYER_CACHE_TTL)
+        set_cache("players:ranking", payload, ttl=PLAYER_CACHE_TTL)
+        return {
+            "status": result["status"],
+            "synced": result.get("synced", 0),
+            "last_synced": result.get("last_synced"),
+            "source": result.get("source"),
+            "reason": result.get("reason"),
+        }
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail="Failed to sync players from Sleeper")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to sync players: {str(e)}")
+
+
+@app.get("/players/sync/status")
+async def get_player_sync_status():
+    status = get_sync_status()
+    return status
 
 @app.post("/recommend", response_model=RecommendationResponse)
 async def get_recommendations(request: RecommendationRequest):

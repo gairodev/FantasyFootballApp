@@ -1,6 +1,6 @@
-import json
 from fastapi.testclient import TestClient
 from main import app
+import main
 
 
 client = TestClient(app)
@@ -26,20 +26,15 @@ def test_players_success(monkeypatch):
     # Minimal player payload
     players_payload = {"123": {"full_name": "Test Player", "pos": "RB"}}
 
-    class Resp:
-        is_success = True
-        def json(self):
-            return players_payload
+    async def fake_ensure_players_loaded():
+        return players_payload
 
-    import httpx
-    async def fake_get(self, url, *a, **k):  # type: ignore
-        return Resp()
-    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    monkeypatch.setattr(main, "ensure_players_loaded", fake_ensure_players_loaded)
 
     resp = client.get("/players")
     assert resp.status_code == 200
     data = resp.json()
-    assert "players" in data and isinstance(data["players"], dict)
+    assert data["players"] == players_payload
 
 
 def test_get_drafts_success(monkeypatch):
@@ -76,5 +71,33 @@ def test_get_picks_success(monkeypatch):
     resp = client.get("/picks", params={"draft_id": "D1"})
     assert resp.status_code == 200
     assert resp.json()["picks"] == picks_payload
+
+
+def test_player_sync_endpoint(monkeypatch):
+    async def fake_sync_players(force: bool = False):
+        return {
+            "status": "updated",
+            "synced": 2,
+            "last_synced": 123.0,
+            "source": "sleeper",
+            "players": {"1": {"full_name": "A", "pos": "RB"}},
+        }
+
+    monkeypatch.setattr(main, "sync_players", fake_sync_players)
+
+    resp = client.post("/players/sync")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "updated"
+    assert body["synced"] == 2
+
+
+def test_player_sync_status(monkeypatch):
+    monkeypatch.setattr(main, "get_sync_status", lambda: {"last_synced": 456.0, "last_error": None, "interval_seconds": 60})
+
+    resp = client.get("/players/sync/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["last_synced"] == 456.0
 
 

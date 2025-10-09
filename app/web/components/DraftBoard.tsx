@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Clock, Users, Target, TrendingUp, Shield, Zap, AlertCircle, CheckCircle, RefreshCw, Play, Pause, Trophy } from 'lucide-react';
-import { Draft, League, Pick, Player, Recommendation, Strategy } from '../types';
+import { Draft, League, Pick, Player, Recommendation, Strategy, PlayerSyncStatus } from '../types';
 
 interface DraftBoardProps {
   draft: Draft;
@@ -19,6 +19,46 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
   const [lastUpdated, setLastUpdated] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [llmEnabled, setLlmEnabled] = useState(false);
+  const [isSyncingPlayers, setIsSyncingPlayers] = useState(false);
+  const [playerSyncMessage, setPlayerSyncMessage] = useState<string | null>(null);
+  const [playerSyncError, setPlayerSyncError] = useState<string | null>(null);
+  const [lastPlayerSync, setLastPlayerSync] = useState<number | null>(null);
+  const [playerSyncStatus, setPlayerSyncStatus] = useState<PlayerSyncStatus | null>(null);
+
+  const loadPlayers = useCallback(async () => {
+    const response = await fetch('/api/players');
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      throw new Error('Failed to parse player data');
+    }
+
+    if (!response.ok || !data) {
+      throw new Error(data?.detail || 'Failed to load player data');
+    }
+
+    const normalizedPlayers: Player[] = Array.isArray(data.players)
+      ? data.players
+      : Object.values(data.players || {});
+    setPlayers(normalizedPlayers);
+  }, []);
+
+  const fetchSyncStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/players/sync/status');
+      if (!response.ok) {
+        return;
+      }
+      const status: PlayerSyncStatus = await response.json();
+      setPlayerSyncStatus(status);
+      if (status.last_synced) {
+        setLastPlayerSync(status.last_synced * 1000);
+      }
+    } catch (statusError) {
+      console.error('Failed to fetch player sync status:', statusError);
+    }
+  }, []);
 
   // Polling interval for live updates
   useEffect(() => {
@@ -34,10 +74,11 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
 
         // Fetch players (only once)
         if (players.length === 0) {
-          const playersResponse = await fetch('/api/players');
-          if (playersResponse.ok) {
-            const playersData = await playersResponse.json();
-            setPlayers(playersData.players);
+          try {
+            await loadPlayers();
+          } catch (playerError) {
+            console.error('Failed to load player data:', playerError);
+            setError('Failed to load player data');
           }
         }
       } catch (error) {
@@ -53,7 +94,7 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
     const interval = setInterval(fetchData, 3000);
 
     return () => clearInterval(interval);
-  }, [draft.draft_id, players.length]);
+  }, [draft.draft_id, players.length, loadPlayers]);
 
   // Calculate current draft state
   const currentPick = picks.length + 1;
@@ -100,11 +141,63 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
     }
   };
 
+  const handleSyncPlayers = async () => {
+    setIsSyncingPlayers(true);
+    setPlayerSyncMessage(null);
+    setPlayerSyncError(null);
+
+    try {
+      const response = await fetch('/api/players/sync', {
+        method: 'POST',
+      });
+
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        if (!response.ok) {
+          throw new Error('Failed to sync players');
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.detail || 'Failed to sync players');
+      }
+
+      if (data?.last_synced) {
+        setLastPlayerSync(data.last_synced * 1000);
+      }
+
+      if (data?.status === 'updated') {
+        const updatedCount = data?.synced ? ` (${data.synced} players updated)` : '';
+        setPlayerSyncMessage(`Player pool refreshed${updatedCount}`);
+      } else if (data?.reason === 'recent-sync') {
+        setPlayerSyncMessage('Player data already up to date');
+      } else if (data?.reason === 'retry-window') {
+        setPlayerSyncMessage('Please wait a bit before syncing again');
+      } else {
+        setPlayerSyncMessage('Player sync completed');
+      }
+
+      await loadPlayers();
+      await fetchSyncStatus();
+    } catch (syncError) {
+      console.error('Failed to sync players:', syncError);
+      setPlayerSyncError(syncError instanceof Error ? syncError.message : 'Failed to sync players');
+    } finally {
+      setIsSyncingPlayers(false);
+    }
+  };
+
   useEffect(() => {
     if (teamOnClock && remainingPlayers.length > 0) {
       fetchRecommendations();
     }
   }, [teamOnClock, remainingPlayers.length, strategy]);
+
+  useEffect(() => {
+    fetchSyncStatus();
+  }, [fetchSyncStatus]);
 
   const getStrategyIcon = (strat: Strategy) => {
     switch (strat) {
@@ -173,7 +266,8 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
             </div>
           </div>
           
-          <div className="text-right">
+        <div className="flex flex-col items-end space-y-3 text-right">
+          <div>
             <div className="text-4xl font-bold gradient-text mb-1">
               Pick {currentPick}
             </div>
@@ -181,7 +275,41 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
               Round {currentRound}, Pick {pickInRound}
             </div>
           </div>
+          <div className="flex flex-col items-end space-y-2">
+            <button
+              onClick={handleSyncPlayers}
+              disabled={isSyncingPlayers}
+              className="flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/20 bg-white/10 hover:bg-white/20 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncingPlayers ? 'animate-spin' : ''}`} />
+              <span>{isSyncingPlayers ? 'Syncing…' : 'Sync player data'}</span>
+            </button>
+            <span className="text-white/50 text-xs">
+              {lastPlayerSync
+                ? `Last synced ${new Date(lastPlayerSync).toLocaleString()}`
+                : 'Auto-sync keeps players fresh'}
+            </span>
+            {playerSyncMessage && (
+              <div className="flex items-center space-x-2 text-green-300 text-xs bg-green-500/10 border border-green-500/20 rounded-md px-2 py-1">
+                <CheckCircle className="h-3.5 w-3.5" />
+                <span>{playerSyncMessage}</span>
+              </div>
+            )}
+            {playerSyncError && (
+              <div className="flex items-center space-x-2 text-red-300 text-xs bg-red-500/10 border border-red-500/20 rounded-md px-2 py-1">
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span>{playerSyncError}</span>
+              </div>
+            )}
+            {!playerSyncError && playerSyncStatus?.last_error && (
+              <div className="flex items-center space-x-2 text-amber-200 text-xs bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-1">
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span>{playerSyncStatus.last_error}</span>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
 
         {/* Strategy Selector */}
         <div className="space-y-4">
