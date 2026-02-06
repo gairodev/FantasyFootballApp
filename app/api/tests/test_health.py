@@ -21,5 +21,5 @@ def test_health_ok():
     assert data.get("status") == "healthy"
     assert isinstance(data.get("timestamp"), int)
     assert isinstance(data.get("cache_entries"), int)
-
-
+    assert data.get("llm_provider") == "anthropic"
+    assert isinstance(data.get("llm_configured"), bool)
