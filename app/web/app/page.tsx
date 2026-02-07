@@ -9,7 +9,7 @@ import { League, Draft } from '../types';
 
 export default function Home() {
   const [username, setUsername] = useState('');
-  const [season, setSeason] = useState('2024');
+  const [season, setSeason] = useState('2025');
   const [isLoading, setIsLoading] = useState(false);
   const [userData, setUserData] = useState<{ user_id: string; leagues: League[] } | null>(null);
   const [selectedLeague, setSelectedLeague] = useState<League | null>(null);
@@ -182,9 +182,9 @@ export default function Home() {
                     onChange={(e) => setSeason(e.target.value)}
                     className="sleeper-input w-full px-4 py-4 text-lg"
                   >
+                    <option value="2025">2025 Season</option>
                     <option value="2024">2024 Season</option>
                     <option value="2023">2023 Season</option>
-                    <option value="2022">2022 Season</option>
                   </select>
                 </div>
 

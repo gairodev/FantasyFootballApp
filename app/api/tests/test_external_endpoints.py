@@ -1,4 +1,6 @@
+import pytest
 from fastapi.testclient import TestClient
+
 from main import app
 import main
 
@@ -7,8 +9,7 @@ client = TestClient(app)
 
 
 def test_discover_user_not_found(monkeypatch):
-    # First call returns a user without user_id → API should return 404
-    async def fake_get(self, url, *args, **kwargs):  # type: ignore
+    async def fake_get(self, url, *args, **kwargs):
         class Resp:
             is_success = True
             def json(self):
@@ -22,19 +23,39 @@ def test_discover_user_not_found(monkeypatch):
     assert resp.status_code == 404
 
 
-def test_players_success(monkeypatch):
-    # Minimal player payload
-    players_payload = {"123": {"full_name": "Test Player", "pos": "RB"}}
+def test_players_success_with_pagination(monkeypatch):
+    players_payload = {
+        "1": {"full_name": "Test Player", "pos": "RB"},
+        "2": {"full_name": "Another Player", "pos": "QB"},
+        "3": {"full_name": "Third Player", "pos": "WR"},
+    }
 
     async def fake_ensure_players_loaded():
         return players_payload
 
     monkeypatch.setattr(main, "ensure_players_loaded", fake_ensure_players_loaded)
 
+    # Default request
     resp = client.get("/players")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["players"] == players_payload
+    assert "players" in data
+    assert data["total"] == 3
+    assert data["limit"] == 500
+    assert data["offset"] == 0
+
+    # Paginated request
+    resp = client.get("/players", params={"limit": 1, "offset": 0})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["players"]) == 1
+    assert data["total"] == 3
+
+    # Position filter
+    resp = client.get("/players", params={"pos": "RB"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
 
 
 def test_get_drafts_success(monkeypatch):
@@ -46,7 +67,7 @@ def test_get_drafts_success(monkeypatch):
             return drafts_payload
 
     import httpx
-    async def fake_get(self, url, *a, **k):  # type: ignore
+    async def fake_get(self, url, *a, **k):
         return Resp()
     monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
 
@@ -64,7 +85,7 @@ def test_get_picks_success(monkeypatch):
             return picks_payload
 
     import httpx
-    async def fake_get(self, url, *a, **k):  # type: ignore
+    async def fake_get(self, url, *a, **k):
         return Resp()
     monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
 
@@ -99,5 +120,3 @@ def test_player_sync_status(monkeypatch):
     assert resp.status_code == 200
     data = resp.json()
     assert data["last_synced"] == 456.0
-
-

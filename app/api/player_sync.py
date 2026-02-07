@@ -37,7 +37,7 @@ def _serialize_player(player: DatabasePlayer) -> Dict[str, Any]:
         "bye_week": player.bye_week,
         "injury_status": player.injury_status,
         "news": player.news,
-        **(player.metadata or {}),
+        "metadata": player.metadata or {},
     }
 
 
@@ -55,6 +55,7 @@ async def _store_players(players: Dict[str, Any]) -> int:
             continue
         full_name = player_data.get("full_name")
         if not full_name:
+            logger.warning("Skipping player %s: missing full_name", player_id)
             continue
         player_models.append(
             DatabasePlayer(
@@ -145,7 +146,15 @@ async def sync_players(force: bool = False) -> Dict[str, Any]:
         except Exception as exc:  # pragma: no cover - logging path
             _last_sync_error = str(exc)
             logger.error("Player sync failed: %s", exc)
-            raise
+            players = await _load_players_from_db()
+            return {
+                "status": "error",
+                "error": str(exc),
+                "last_synced": _last_successful_sync,
+                "synced": 0,
+                "source": "database",
+                "players": players,
+            }
 
 
 def get_sync_status() -> Dict[str, Any]:

@@ -13,9 +13,9 @@ from main import app  # type: ignore
 
 
 @pytest.fixture(autouse=True)
-def no_openai(monkeypatch):
+def no_anthropic(monkeypatch):
     """Disable LLM usage during tests to avoid external calls."""
-    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     yield
 
 

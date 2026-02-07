@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Clock, Users, Target, TrendingUp, Shield, Zap, AlertCircle, CheckCircle, RefreshCw, Play, Pause, Trophy } from 'lucide-react';
 import { Draft, League, Pick, Player, Recommendation, Strategy, PlayerSyncStatus } from '../types';
 
@@ -87,13 +87,17 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
       }
     };
 
-    // Initial fetch
-    fetchData();
+    // Initial fetch after a small delay, then poll every 3 seconds
+    const timeout = setTimeout(() => {
+      fetchData();
+    }, 500);
 
-    // Set up polling every 3 seconds
     const interval = setInterval(fetchData, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, [draft.draft_id, players.length, loadPlayers]);
 
   // Calculate current draft state
@@ -106,8 +110,17 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
   const draftedPlayerIds = new Set(picks.map(pick => pick.player_id));
   const remainingPlayers = players.filter(player => !draftedPlayerIds.has(player.player_id));
 
+  // O(1) player lookups via Map keyed by player_id
+  const playerMap = useMemo(() => {
+    const map = new Map<string, Player>();
+    for (const player of players) {
+      map.set(player.player_id, player);
+    }
+    return map;
+  }, [players]);
+
   // Get recommendations
-  const fetchRecommendations = async () => {
+  const fetchRecommendations = useCallback(async () => {
     if (!teamOnClock) return;
 
     setIsLoading(true);
@@ -139,7 +152,7 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [draft.draft_id, teamOnClock, strategy]);
 
   const handleSyncPlayers = async () => {
     setIsSyncingPlayers(true);
@@ -193,7 +206,7 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
     if (teamOnClock && remainingPlayers.length > 0) {
       fetchRecommendations();
     }
-  }, [teamOnClock, remainingPlayers.length, strategy]);
+  }, [teamOnClock, remainingPlayers.length, strategy, fetchRecommendations]);
 
   useEffect(() => {
     fetchSyncStatus();
@@ -233,18 +246,15 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
   };
 
   const getPlayerName = (playerId: string) => {
-    const player = players.find(p => p.player_id === playerId);
-    return player?.full_name || 'Unknown Player';
+    return playerMap.get(playerId)?.full_name || 'Unknown Player';
   };
 
   const getPlayerPosition = (playerId: string) => {
-    const player = players.find(p => p.player_id === playerId);
-    return player?.pos || 'UNK';
+    return playerMap.get(playerId)?.pos || 'UNK';
   };
 
   const getPlayerTeam = (playerId: string) => {
-    const player = players.find(p => p.player_id === playerId);
-    return player?.team || '';
+    return playerMap.get(playerId)?.team || '';
   };
 
   return (
@@ -354,7 +364,7 @@ export default function DraftBoard({ draft, league, username }: DraftBoardProps)
               {llmEnabled ? 'AI-powered recommendations enabled' : 'Deterministic rankings only'}
             </div>
             <div className="text-white/60 text-sm">
-              {llmEnabled ? 'OpenAI integration active' : 'OpenAI not configured'}
+              {llmEnabled ? 'Claude AI integration active' : 'Claude AI not configured'}
             </div>
           </div>
         </div>

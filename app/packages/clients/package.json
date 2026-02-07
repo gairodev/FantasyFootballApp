@@ -1,7 +1,7 @@
 {
   "name": "@fantasy-football/clients",
   "version": "1.0.0",
-  "description": "Client SDKs for Sleeper and OpenAI APIs",
+  "description": "Client SDKs for Sleeper and Anthropic APIs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -11,7 +11,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "openai": "^4.0.0"
+    "@anthropic-ai/sdk": "^0.30.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",
@@ -20,7 +20,7 @@
     "ts-jest": "^29.1.0",
     "typescript": "^5.0.0"
   },
-  "keywords": ["fantasy-football", "sleeper", "openai", "api"],
+  "keywords": ["fantasy-football", "sleeper", "anthropic", "api"],
   "author": "Fantasy Football App Team",
   "license": "MIT"
 }
